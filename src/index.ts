@@ -33,12 +33,11 @@ app.post(
     }
 
     try {
-      const body = await c.req.arrayBuffer();
+      const payload = await c.req.json();
 
       const response = await sendLogsToGoogle(
-        body,
+        payload,
         env.gcpProjectId,
-        contentType,
       );
 
       if (!response.ok) {
