@@ -4,6 +4,7 @@ import { bearerAuth } from "hono/bearer-auth";
 
 import { getEnv } from "./env.js";
 import { sendLogsToGoogle } from "./telemetry.js";
+import { decodeOtlpLogs } from "./otlp.js";
 
 const env = getEnv();
 
@@ -21,6 +22,7 @@ app.post(
     token: env.ingestToken,
   }),
   async (c) => {
+  try {
     const contentType = c.req.header("Content-Type");
 
     if (!contentType?.startsWith("application/json")) {
@@ -32,56 +34,59 @@ app.post(
       );
     }
 
-    try {
-      const payload = await c.req.json();
+    const body = await c.req.arrayBuffer();
 
-      const response = await sendLogsToGoogle(
-        payload,
-        env.gcpProjectId,
-      );
+    const payload = await decodeOtlpLogs(
+      body,
+      c.req.header("Content-Encoding"),
+    );
 
-      if (!response.ok) {
-        const responseBody = await response.text();
+    const response = await sendLogsToGoogle(
+      payload,
+      env.gcpProjectId,
+    );
 
-        console.error(
-          JSON.stringify({
-            severity: "ERROR",
-            message: "Google Telemetry API request failed",
-            status: response.status,
-            response: responseBody,
-          }),
-        );
+    if (!response.ok) {
+      const responseBody = await response.text();
 
-        return c.json(
-          {
-            error: "telemetry_api_error",
-          },
-          502,
-        );
-      }
-
-      return c.json({});
-    } catch (error) {
       console.error(
         JSON.stringify({
           severity: "ERROR",
-          message: "Failed to ingest Cloudflare logs",
-          error:
-            error instanceof Error
-              ? error.message
-              : String(error),
+          message: "Google Telemetry API request failed",
+          status: response.status,
+          response: responseBody,
         }),
       );
 
       return c.json(
         {
-          error: "internal_server_error",
+          error: "telemetry_api_error",
         },
-        500,
+        502,
       );
     }
-  },
-);
+
+    return c.json({});
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        message: "Failed to ingest Cloudflare logs",
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      }),
+    );
+
+    return c.json(
+      {
+        error: "internal_server_error",
+      },
+      500,
+    );
+  }
+});
 
 serve({
   fetch: app.fetch,

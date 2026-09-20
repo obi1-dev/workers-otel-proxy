@@ -1,26 +1,17 @@
 import { GoogleAuth } from "google-auth-library";
+import type {
+  OtlpAttribute,
+  OtlpLogs,
+} from "./otlp.js";
 
 const TELEMETRY_LOGS_ENDPOINT =
   "https://telemetry.googleapis.com/v1/logs";
 
 const auth = new GoogleAuth({
-  scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+  scopes: [
+    "https://www.googleapis.com/auth/cloud-platform",
+  ],
 });
-
-type OtlpAttribute = {
-  key: string;
-  value: {
-    stringValue?: string;
-  };
-};
-
-type OtlpLogs = {
-  resourceLogs?: Array<{
-    resource?: {
-      attributes?: OtlpAttribute[];
-    };
-  }>;
-};
 
 function setResourceAttribute(
   attributes: OtlpAttribute[],
